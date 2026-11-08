@@ -81,3 +81,9 @@
 .pg-specs span{font-size:2.4cqw;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
 
 @media (prefers-reduced-motion:reduce){.fb-leaf,.fb-stage{transition-duration:.01s!important}}
+
+/* cover photo */
+.pg-cover-photo{position:relative;flex:1;min-height:0;margin:6cqw 0 0;border-radius:1.6cqw;overflow:hidden;border:1px solid #ffffff26;box-shadow:0 2cqw 5cqw -2cqw #000c}
+.pg-cover-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.pg-cover-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#121a2600 55%,#121a26cc 100%);pointer-events:none}
+.pg-cover-photo figcaption{position:absolute;right:2.5cqw;bottom:2cqw;z-index:1;font-size:1.9cqw;letter-spacing:.04em;color:#ffffffb3}

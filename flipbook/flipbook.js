@@ -165,7 +165,8 @@
     '<div class="pg pg-cover"><div class="pg-top"><span>Project flipbook</span><span>Vol. 01</span></div>' +
       '<h3>Building a <em>home,</em> stage by stage.</h3>' +
       '<p class="pg-sub">A civil engineer’s walkthrough of a two-storey residential build — from setting out to handover.</p>' +
-      '<div class="pg-draw">' + D.cover + "</div>" +
+      '<figure class="pg-cover-photo"><img src="/flipbook/cover-house.jpg" alt="Modern two-storey house at dusk" loading="lazy">' +
+      '<figcaption>Photo: vcmxnajg1 · CC BY 2.0 · Wikimedia Commons</figcaption></figure>' +
       '<div class="pg-foot"><span><b>Hamza Murad</b> · Civil Site Engineer</span><span>Tap to open</span></div></div>',
 
     '<div class="pg"><div class="pg-top"><span>HM · House Build</span><span>02</span></div>' +
