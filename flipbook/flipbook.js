@@ -211,14 +211,26 @@
     sec.id = "flipbook";
     sec.className = "fb-section mx-auto max-w-6xl px-6 pb-20";
     sec.setAttribute("aria-label", "House construction flipbook");
+    var pages = FACES.map(function (f, i) {
+      var hard = i === 0 || i === FACES.length - 1;
+      return '<div class="fb-page' + (hard ? " fb-hard" : "") + '" data-density="' + (hard ? "hard" : "soft") + '"><div class="fb-face">' + f + "</div></div>";
+    }).join("");
     sec.innerHTML =
       '<div class="fb-head"><div><p class="section-label mb-3">Flipbook</p>' +
       '<h2 class="font-display text-3xl sm:text-4xl">From setting out to handover.</h2>' +
       '<p class="fb-lead">Flip through the stages of a residential house build — drawings, checks and site notes the way a site engineer sees them.</p></div></div>' +
-      '<div class="fb-wrap"><div class="fb-stage" tabindex="0" aria-roledescription="flipbook"><div class="fb-book"><div class="fb-shadow"></div></div></div></div>' +
+      '<div class="fb-wrap"><div class="fb-desk"><div class="fb-stage" tabindex="0" aria-roledescription="flipbook"><div class="fb-book">' + pages + "</div></div></div></div>" +
       '<div class="fb-controls"><button type="button" class="fb-btn fb-prev" aria-label="Previous page">←</button><span class="fb-count" aria-live="polite"></span><button type="button" class="fb-btn fb-next" aria-label="Next page">→</button></div>' +
-      '<p class="fb-hint">Click a page, swipe, or use the arrow keys</p>';
+      '<p class="fb-hint">Drag a page corner, click, swipe, or use the arrow keys</p>';
     return sec;
+  }
+
+  function loadLib(cb) {
+    if (window.St && window.St.PageFlip) return cb();
+    var s = document.createElement("script");
+    s.src = "/flipbook/page-flip.browser.js";
+    s.onload = cb;
+    document.head.appendChild(s);
   }
 
   function init(sec) {
@@ -227,83 +239,41 @@
     var prev = sec.querySelector(".fb-prev");
     var next = sec.querySelector(".fb-next");
     var count = sec.querySelector(".fb-count");
-    var mq = window.matchMedia("(max-width: 640px)");
-    var single = null, leaves = [], cur = 0;
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var pf = new window.St.PageFlip(book, {
+      width: 500, height: 667, size: "stretch",
+      minWidth: 260, maxWidth: 560, minHeight: 347, maxHeight: 747,
+      showCover: true, usePortrait: true, drawShadow: true, maxShadowOpacity: 0.55,
+      flippingTime: reduce ? 1 : 1100, mobileScrollSupport: true, swipeDistance: 30,
+      showPageCorners: true, startZIndex: 1, autoSize: true
+    });
+    pf.loadFromHTML(book.querySelectorAll(".fb-page"));
+    var total = pf.getPageCount();
 
-    function layout() {
-      var wasSingle = single;
-      single = mq.matches;
-      if (wasSingle === single) return;
-      var firstFace = wasSingle === null ? 0 : (wasSingle ? cur : Math.max(0, cur * 2 - 1));
-      leaves.forEach(function (l) { l.remove(); });
-      leaves = [];
-      var pairs = [];
-      if (single) FACES.forEach(function (f) { pairs.push([f, ""]); });
-      else for (var i = 0; i < FACES.length; i += 2) pairs.push([FACES[i], FACES[i + 1] || ""]);
-      pairs.forEach(function (p, i) {
-        var leaf = document.createElement("div");
-        leaf.className = "fb-leaf";
-        leaf.innerHTML = '<div class="fb-face fb-front">' + p[0] + '</div><div class="fb-face fb-back">' + p[1] + "</div>";
-        leaf.addEventListener("click", function () { go(leaf.classList.contains("is-flipped") ? i : i + 1); });
-        book.appendChild(leaf);
-        leaves.push(leaf);
-      });
-      stage.classList.toggle("is-single", single);
-      cur = single ? firstFace : Math.ceil(firstFace / 2);
-      render(true);
+    function update() {
+      var i = pf.getCurrentPageIndex();
+      var portrait = pf.getOrientation() === "portrait";
+      prev.disabled = i === 0;
+      next.disabled = portrait ? i >= total - 1 : i >= total - 1 || (i === total - 2 && false);
+      if (i === 0) count.textContent = "Cover";
+      else if (i >= total - 1) count.textContent = "Back cover";
+      else if (portrait) count.textContent = "Page " + (i + 1) + " / " + total;
+      else {
+        var l = i % 2 ? i : i - 1;
+        count.textContent = "Pages " + (l + 1) + "–" + (l + 2) + " / " + total;
+      }
+      stage.classList.toggle("is-cover", !portrait && i === 0);
+      stage.classList.toggle("is-back", !portrait && i >= total - 1);
     }
-
-    function render(instant) {
-      var n = leaves.length;
-      leaves.forEach(function (l, i) {
-        var flipped = i < cur;
-        if (instant) l.style.transition = "none";
-        var changed = l.classList.contains("is-flipped") !== flipped;
-        l.classList.toggle("is-flipped", flipped);
-        if (changed && !instant) {
-          l.style.zIndex = 2 * n + 1;
-          clearTimeout(l._t);
-          l._t = setTimeout(function () { l.style.zIndex = flipped ? i + 1 : n - i; }, 900);
-        } else {
-          l.style.zIndex = flipped ? i + 1 : n - i;
-        }
-        if (instant) { void l.offsetWidth; l.style.transition = ""; }
-      });
-      stage.classList.toggle("is-closed-front", !single && cur === 0);
-      stage.classList.toggle("is-closed-back", !single && cur === n);
-      prev.disabled = cur === 0;
-      next.disabled = cur === n || (single && cur === n - 1);
-      var total = FACES.length;
-      if (single) count.textContent = "Page " + (cur + 1) + " / " + total;
-      else if (cur === 0) count.textContent = "Cover";
-      else if (cur === n) count.textContent = "Back cover";
-      else count.textContent = "Pages " + (cur * 2) + "–" + (cur * 2 + 1) + " / " + total;
-    }
-
-    function go(to) {
-      var max = single ? leaves.length - 1 : leaves.length;
-      to = Math.max(0, Math.min(max, to));
-      if (to === cur) return;
-      cur = to;
-      render(false);
-    }
-
-    prev.addEventListener("click", function () { go(cur - 1); });
-    next.addEventListener("click", function () { go(cur + 1); });
+    pf.on("flip", update);
+    pf.on("changeOrientation", update);
+    prev.addEventListener("click", function () { pf.flipPrev("top"); });
+    next.addEventListener("click", function () { pf.flipNext("top"); });
     stage.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowRight") { go(cur + 1); e.preventDefault(); }
-      if (e.key === "ArrowLeft") { go(cur - 1); e.preventDefault(); }
+      if (e.key === "ArrowRight") { pf.flipNext("top"); e.preventDefault(); }
+      if (e.key === "ArrowLeft") { pf.flipPrev("top"); e.preventDefault(); }
     });
-    var sx = null, sy = null;
-    stage.addEventListener("touchstart", function (e) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
-    stage.addEventListener("touchend", function (e) {
-      if (sx === null) return;
-      var dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { go(cur + (dx < 0 ? 1 : -1)); e.preventDefault(); }
-      sx = null;
-    });
-    if (mq.addEventListener) mq.addEventListener("change", layout); else mq.addListener(layout);
-    layout();
+    update();
   }
 
   /* ---------- insert after the "On site" section ---------- */
@@ -317,7 +287,7 @@
     if (section && document.body.contains(section)) return;
     var anchor = findAnchor();
     if (!anchor) return;
-    if (!section) { section = buildSection(); anchor.after(section); init(section); }
+    if (!section) { section = buildSection(); anchor.after(section); loadLib(function () { init(section); }); }
     else anchor.after(section);
   }
   function start() {
