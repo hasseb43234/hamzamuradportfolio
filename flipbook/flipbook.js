@@ -220,8 +220,8 @@
       '<h2 class="font-display text-3xl sm:text-4xl">From setting out to handover.</h2>' +
       '<p class="fb-lead">Flip through the stages of a residential house build — drawings, checks and site notes the way a site engineer sees them.</p></div></div>' +
       '<div class="fb-wrap"><div class="fb-desk"><div class="fb-stage" tabindex="0" aria-roledescription="flipbook"><div class="fb-book">' + pages + "</div></div></div></div>" +
-      '<div class="fb-controls"><button type="button" class="fb-btn fb-prev" aria-label="Previous page">←</button><span class="fb-count" aria-live="polite"></span><button type="button" class="fb-btn fb-next" aria-label="Next page">→</button></div>' +
-      '<p class="fb-hint">Drag a page corner, click, swipe, or use the arrow keys</p>';
+      '<div class="fb-controls"><button type="button" class="fb-btn fb-prev" aria-label="Previous page">←</button><span class="fb-count" aria-live="polite"></span><button type="button" class="fb-btn fb-next" aria-label="Next page">→</button><button type="button" class="fb-btn fb-play" aria-pressed="true" aria-label="Pause automatic page turning">❚❚</button></div>' +
+      '<p class="fb-hint">Pages turn by themselves — drag a corner, swipe or use the arrows to take over</p>';
     return sec;
   }
 
@@ -267,11 +267,45 @@
     }
     pf.on("flip", update);
     pf.on("changeOrientation", update);
-    prev.addEventListener("click", function () { pf.flipPrev("top"); });
-    next.addEventListener("click", function () { pf.flipNext("top"); });
+    /* ---- autoplay: turns pages by itself while the book is on screen ---- */
+    var play = sec.querySelector(".fb-play");
+    var DELAY = 2600, timer = null, visible = false, userStopped = reduce;
+    function tick() {
+      timer = null;
+      if (!visible || userStopped) return;
+      if (pf.getCurrentPageIndex() >= total - 1) {
+        timer = setTimeout(function () { if (visible && !userStopped) { pf.turnToPage(0); update(); schedule(); } }, DELAY);
+        return;
+      }
+      pf.flipNext("top");
+      schedule();
+    }
+    function schedule() { clearTimeout(timer); timer = setTimeout(tick, DELAY); }
+    function setPlaying(on) {
+      userStopped = !on;
+      play.setAttribute("aria-pressed", on ? "true" : "false");
+      play.setAttribute("aria-label", on ? "Pause automatic page turning" : "Play automatic page turning");
+      play.textContent = on ? "❚❚" : "▶";
+      if (on && visible) { clearTimeout(timer); timer = setTimeout(tick, 900); } else clearTimeout(timer);
+    }
+    function stopByUser() { if (!userStopped) setPlaying(false); }
+    play.addEventListener("click", function () { setPlaying(userStopped); });
+    stage.addEventListener("pointerdown", stopByUser);
+    stage.addEventListener("touchstart", stopByUser, { passive: true });
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible && !userStopped) { clearTimeout(timer); timer = setTimeout(tick, 1200); }
+        else clearTimeout(timer);
+      }, { threshold: 0.45 }).observe(stage);
+    }
+    setPlaying(!userStopped);
+
+    prev.addEventListener("click", function () { stopByUser(); pf.flipPrev("top"); });
+    next.addEventListener("click", function () { stopByUser(); pf.flipNext("top"); });
     stage.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowRight") { pf.flipNext("top"); e.preventDefault(); }
-      if (e.key === "ArrowLeft") { pf.flipPrev("top"); e.preventDefault(); }
+      if (e.key === "ArrowRight") { stopByUser(); pf.flipNext("top"); e.preventDefault(); }
+      if (e.key === "ArrowLeft") { stopByUser(); pf.flipPrev("top"); e.preventDefault(); }
     });
     update();
   }
